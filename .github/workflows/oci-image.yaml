@@ -1,0 +1,59 @@
+name: Build container image
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: Tag name for release
+        required: false
+        default: test
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
+
+env:
+  NAME: k8s-testapp
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  build-and-upload-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: nixbuild/nix-quick-install-action@v30
+      - uses: nix-community/cache-nix-action@v6
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          gc-max-store-size-linux: 1G
+          purge: true
+          purge-prefixes: nix-${{ runner.os }}-
+          purge-created: 0
+          purge-last-accessed: 0
+          purge-primary-key: never
+      - run: nix flake check
+      - name: Login to registry
+        run: >
+          echo "${{ secrets.GITHUB_TOKEN }}" |
+          nix run nixpkgs#skopeo -- login --username ${{ github.actor }} --password-stdin ghcr.io
+      - if: github.event_name == 'workflow_dispatch'
+        run: echo "TAG=${{ github.event.inputs.tag_name }}" >> $GITHUB_ENV
+      - if: github.event_name == 'push'
+        run: |
+          TAG=${{ github.ref }}
+          echo "TAG=${TAG#refs/tags/}" >> $GITHUB_ENV
+      - name: Build and upload image
+        run: |
+          nix build .#oci-image
+          ./result > archive.tar.gz
+
+          commit="$(git rev-parse --short ${{ github.sha }})"
+          tag="${{ env.TAG }}"
+          src="docker-archive:./archive.tar.gz"
+          image="ghcr.io/${{ github.repository }}"
+
+          nix run nixpkgs#skopeo -- copy "$src" "docker://$image:$commit"
+          nix run nixpkgs#skopeo -- copy "$src" "docker://$image:$tag"

@@ -1,11 +1,11 @@
-name: CI
+name: CI check
 
 on:
   push:
     branches:
       - 'master'
     paths-ignore:
-      - '.github/workflows/release.yaml'
+      - '.github/workflows/oci-image.yaml'
       - '.gitignore'
       - 'CHANGELOG.md'
       - 'LICENSE'
