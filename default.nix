@@ -7,7 +7,7 @@
 
 buildGo125Module (final: {
   pname = "k8s-testapp";
-  version = "0.0.1";
+  version = "0.0.2";
 
   src = lib.cleanSource ./src/.;
   vendorHash = "sha256-aOcwjelq68EMOje6gGjBWMY5GUlnD4Gy9ZhMQjnbvs4=";

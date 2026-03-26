@@ -19,7 +19,7 @@ services:
       postgres:
         condition: service_healthy
         restart: true
-    # image: ghcr.io/as3ii/k8s-testapp:v0.0.1
+    # image: ghcr.io/as3ii/k8s-testapp:v0.0.2
     build: .
     environment:
       DB_USER: testapp
