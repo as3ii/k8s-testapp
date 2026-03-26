@@ -1,0 +1,34 @@
+---
+services:
+  postgres:
+    image: postgres:18.3-alpine
+    environment:
+      POSTGRES_USER: testapp
+      POSTGRES_PASSWORD: testapp
+      POSTGRES_DB: testapp
+    volumes:
+      - postgres:/var/lib/postgressql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testapp -d testapp"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  testapp:
+    depends_on:
+      postgres:
+        condition: service_healthy
+        restart: true
+    # image: ghcr.io/as3ii/k8s-testapp:v0.0.1
+    build: .
+    environment:
+      DB_USER: testapp
+      DB_PASSWORD: testapp
+      DB_NAME: testapp
+      DB_HOST: postgres
+      DB_PORT: 5432
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres: {}
