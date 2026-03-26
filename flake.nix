@@ -12,6 +12,7 @@
 
   outputs =
     {
+      self,
       flake-parts,
       git-hooks-nix,
       ...
@@ -59,15 +60,15 @@
             };
           };
 
-          packages.default = pkgs.buildGoModule {
-            pname = "k8s-testapp";
-            version = "0.0.1";
-            src = ./src/.;
-            vendorHash = "sha256-aOcwjelq68EMOje6gGjBWMY5GUlnD4Gy9ZhMQjnbvs4=";
+          packages = rec {
+            default = k8s-testapp;
+            k8s-testapp = pkgs.callPackage ./default.nix { };
+            k8s-testapp-static = pkgs.callPackage ./default.nix { static = true; };
+            oci-image = pkgs.callPackage ./oci-image.nix {
+              inherit k8s-testapp;
 
-            meta = {
-              description = "App to test my k8s cluster";
-              mainProgram = "k8s-testapp";
+              created = builtins.substring 0 8 self.lastModifiedDate;
+              revision = self.rev or self.dirtyRev or null;
             };
           };
 

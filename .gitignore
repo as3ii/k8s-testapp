@@ -1,4 +1,5 @@
 **/result
+**/k8s-testapp
 
 # nix and direnv
 **/.pre-commit-config.yaml
