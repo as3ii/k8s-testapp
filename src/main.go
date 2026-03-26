@@ -71,6 +71,12 @@ func init() {
 	log.Println("Database initialized successfully")
 }
 
+func JSONError(w http.ResponseWriter, error string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"error": error})
+}
+
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -82,7 +88,7 @@ func getDataHandler(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := db.Query("SELECT id, message, created_at, pod_name FROM records ORDER BY created_at DESC LIMIT 100")
 	if err != nil {
-		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+		JSONError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -91,7 +97,7 @@ func getDataHandler(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var rec Record
 		if err := rows.Scan(&rec.ID, &rec.Message, &rec.CreatedAt, &rec.PodName); err != nil {
-			http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+			JSONError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		records = append(records, rec)
@@ -104,19 +110,19 @@ func postDataHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method != http.MethodPost {
-		http.Error(w, `{"error": "method not allowed"}`, http.StatusMethodNotAllowed)
+		JSONError(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	var req map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusBadRequest)
+		JSONError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	message := req["message"]
 	if message == "" {
-		http.Error(w, `{"error": "message field is required"}`, http.StatusBadRequest)
+		JSONError(w, "message field is required", http.StatusBadRequest)
 		return
 	}
 
@@ -127,7 +133,7 @@ func postDataHandler(w http.ResponseWriter, r *http.Request) {
 	).Scan(&id)
 
 	if err != nil {
-		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+		JSONError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -140,12 +146,12 @@ func getRecordHandler(w http.ResponseWriter, r *http.Request) {
 
 	idStr := r.URL.Query().Get("id")
 	if idStr == "" {
-		http.Error(w, `{"error": "id field is required"}`, http.StatusBadRequest)
+		JSONError(w, "id field is required", http.StatusBadRequest)
 		return
 	}
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, `{"error": "invalid id"}`, http.StatusBadRequest)
+		JSONError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
 
@@ -156,10 +162,10 @@ func getRecordHandler(w http.ResponseWriter, r *http.Request) {
 	).Scan(&rec.ID, &rec.Message, &rec.CreatedAt, &rec.PodName)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, `{"error": "record not found"}`, http.StatusNotFound)
+		JSONError(w, "record not found", http.StatusNotFound)
 		return
 	} else if err != nil {
-		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+		JSONError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -170,35 +176,35 @@ func deleteRecordHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method != http.MethodDelete {
-		http.Error(w, `{"error": "method not allowed"}`, http.StatusMethodNotAllowed)
+		JSONError(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	idStr := r.URL.Query().Get("id")
 	if idStr == "" {
-		http.Error(w, `{"error": "id field is required"}`, http.StatusBadRequest)
+		JSONError(w, "id field is required", http.StatusBadRequest)
 		return
 	}
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, `{"error": "invalid id"}`, http.StatusBadRequest)
+		JSONError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
 
 	result, err := db.Exec("DELETE FROM records WHERE id = $1", id)
 	if err != nil {
-		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+		JSONError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+		JSONError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	if rowsAffected == 0 {
-		http.Error(w, `{"error": "record not found"}`, http.StatusNotFound)
+		JSONError(w, "record not found", http.StatusNotFound)
 		return
 	}
 
@@ -213,7 +219,7 @@ func main() {
 		} else if r.Method == http.MethodPost {
 			postDataHandler(w, r)
 		} else {
-			http.Error(w, `{"error": "method not allowed"}`, http.StatusMethodNotAllowed)
+			JSONError(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
 	http.HandleFunc("/record", func(w http.ResponseWriter, r *http.Request) {
@@ -222,7 +228,7 @@ func main() {
 		} else if r.Method == http.MethodDelete {
 			deleteRecordHandler(w, r)
 		} else {
-			http.Error(w, `{"error": "method not allowed"}`, http.StatusMethodNotAllowed)
+			JSONError(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
 
