@@ -1,0 +1,69 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: k8s-testapp-gateway
+  namespace: k8s-testapp
+  annotations:
+    external-dns.alpha.kubernetes.io/target: traefik.example.com
+    cert-manager.io/cluster-issuer: letsencrypt-production
+spec:
+  gatewayClassName: traefik
+  listeners:
+    - name: web
+      protocol: HTTP
+      port: 8000
+    - name: websecure
+      protocol: HTTPS
+      port: 8443
+      hostname: testapp.example.com
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: k8s-testapp-cert
+
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+   name: k8s-testapp-ingress
+   namespace: k8s-testapp
+spec:
+  parentRefs:
+    - name: k8s-testapp-gateway
+      namespace: k8s-testapp
+      sectionName: web
+
+  hostnames:
+    - testapp.example.com
+
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+   name: k8s-testapp-ingress-secure
+   namespace: k8s-testapp
+spec:
+  parentRefs:
+    - name: k8s-testapp-gateway
+      namespace: k8s-testapp
+      sectionName: websecure
+
+  hostnames:
+    - testapp.example.com
+
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: k8s-testapp
+          port: 8080

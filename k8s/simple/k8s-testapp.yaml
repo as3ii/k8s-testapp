@@ -1,0 +1,99 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8s-testapp
+  namespace: k8s-testapp
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+        app: k8s-testapp
+  template:
+    metadata:
+      labels:
+        app: k8s-testapp
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: postgres:18.3-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Checking PostgreSQL connection..."
+              until pg_isready -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+              do
+                echo "waiting..."
+                sleep 5
+              done
+              echo "PostgreSQL is ready"
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config
+                  key: POSTGRES_USER
+      containers:
+        - name: k8s-testapp
+          image: ghcr.io/as3ii/k8s-testapp:v0.0.2
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config
+                  key: POSTGRES_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config
+                  key: POSTGRES_DB
+            - name: DB_HOST
+              value: postgres
+            - name: DB_PORT
+              value: "5432"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: k8s-testapp
+  namespace: k8s-testapp
+spec:
+  selector:
+    app: k8s-testapp
+  type: ClusterIP
+  ports:
+    - port: 8080

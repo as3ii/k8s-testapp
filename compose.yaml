@@ -7,12 +7,13 @@ services:
       POSTGRES_PASSWORD: testapp
       POSTGRES_DB: testapp
     volumes:
-      - postgres:/var/lib/postgressql/data
+      - postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U testapp -d testapp"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   testapp:
     depends_on:
